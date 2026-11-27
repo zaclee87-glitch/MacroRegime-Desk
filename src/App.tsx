@@ -22,7 +22,7 @@ const STORAGE_REPORTS_KEY = 'macroregime_reports_v2';
 const STORAGE_MESSAGES_KEY = 'macroregime_messages_v2';
 const STORAGE_WATCHLIST_KEY = 'macroregime_watchlist_v2';
 
-async function parseJsonResponse<T = Record<string, any>>(response: Response): Promise<T> {
+async function parseJsonResponse<T = any>(response: Response): Promise<T> {
   const text = await response.text();
   if (!text) {
     if (!response.ok) {
