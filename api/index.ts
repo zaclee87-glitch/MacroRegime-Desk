@@ -766,6 +766,27 @@ function formatGeminiError(err: unknown): { status: number; message: string } {
 export function createApiApp(): express.Express {
   const app = express();
   app.use(express.json({ limit: "2mb" }));
+  app.use((req, _res, next) => {
+    const rawPath = req.query.__path;
+    const pathSegment = Array.isArray(rawPath) ? rawPath[0] : rawPath;
+    if (typeof pathSegment === "string" && pathSegment.length > 0 && !req.url.startsWith("/api/")) {
+      const restQuery = new URLSearchParams();
+      for (const [k, v] of Object.entries(req.query)) {
+        if (k === "__path") continue;
+        if (typeof v === "string") {
+          restQuery.append(k, v);
+        } else if (Array.isArray(v)) {
+          for (const item of v) {
+            if (typeof item === "string") restQuery.append(k, item);
+          }
+        }
+      }
+      const qs = restQuery.toString();
+      const cleanedPath = pathSegment.replace(/^\/+/, "");
+      req.url = `/api/${cleanedPath}${qs ? `?${qs}` : ""}`;
+    }
+    next();
+  });
 
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true, timestamp: new Date().toISOString() });

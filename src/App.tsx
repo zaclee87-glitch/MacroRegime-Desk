@@ -22,6 +22,22 @@ const STORAGE_REPORTS_KEY = 'macroregime_reports_v2';
 const STORAGE_MESSAGES_KEY = 'macroregime_messages_v2';
 const STORAGE_WATCHLIST_KEY = 'macroregime_watchlist_v2';
 
+async function parseJsonResponse<T = Record<string, any>>(response: Response): Promise<T> {
+  const text = await response.text();
+  if (!text) {
+    if (!response.ok) {
+      throw new Error(`Request failed with status ${response.status}`);
+    }
+    return {} as T;
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    const snippet = text.replace(/\s+/g, ' ').trim().slice(0, 140);
+    throw new Error(`Server returned ${response.status} (non-JSON): ${snippet}`);
+  }
+}
+
 const INITIAL_MESSAGES: ChatMessage[] = [
   {
     id: 'msg-init-1',
@@ -412,7 +428,7 @@ export default function App() {
             }),
           });
 
-          const data = await response.json();
+          const data = await parseJsonResponse<any>(response);
           if (!response.ok) {
             throw new Error(data.error || `Request failed (${response.status})`);
           }
@@ -548,7 +564,7 @@ export default function App() {
         }),
       });
 
-      const data = await response.json();
+      const data = await parseJsonResponse<any>(response);
       if (!response.ok) {
         throw new Error(data.error || `Request failed (${response.status})`);
       }
