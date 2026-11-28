@@ -6,10 +6,12 @@ import {
   ArrowUp,
   ArrowUpDown,
   ArrowUpRight,
+  Check,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
   ExternalLink,
+  Link2,
   Minus,
   RefreshCw,
   Search,
@@ -90,6 +92,7 @@ export function StocksSentimentView({
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedSymbols, setExpandedSymbols] = useState<Record<string, boolean>>({});
+  const [copiedBookmark, setCopiedBookmark] = useState(false);
 
   useEffect(() => {
     setWatchlistDraft(serializeWatchlistToText(watchlist));
@@ -339,7 +342,28 @@ export function StocksSentimentView({
     setWatchlistDraft(DEFAULT_WATCHLIST_STRING);
     const entries = parseWatchlistEntries(DEFAULT_WATCHLIST_STRING);
     onSaveWatchlistEntries(entries);
-    setInputFeedback(`Reset watchlist to ${entries.length} default tickers. Click Refresh Watchlist to load.`);
+    setInputFeedback(`Reset watchlist to ${entries.length} factory default tickers. Click Refresh Watchlist to load.`);
+  };
+
+  const handleCopyBookmarkLink = async () => {
+    const entries = parseWatchlistEntries(watchlistDraft);
+    const serialized = entries
+      .map((entry) => (entry.exchangeOverride ? `${entry.exchangeOverride}:${entry.symbol}` : entry.symbol))
+      .join(',');
+    if (!serialized) {
+      setInputFeedback('Add at least one ticker before copying a bookmark link.');
+      return;
+    }
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('wl', serialized);
+      await navigator.clipboard.writeText(url.toString());
+      setCopiedBookmark(true);
+      setInputFeedback('Bookmark link copied — open this URL on any browser or device to load this watchlist.');
+      setTimeout(() => setCopiedBookmark(false), 2500);
+    } catch {
+      setInputFeedback('Unable to copy automatically — copy URL with ?wl=' + serialized);
+    }
   };
 
   const pulsePct =
@@ -422,7 +446,7 @@ export function StocksSentimentView({
           <form onSubmit={handleSaveWatchlist} className="px-4 pb-4 pt-1 border-t border-slate-800/80 space-y-3">
             <p className="text-xs text-slate-400">
               Comma or newline separated. Use <span className="font-mono text-slate-300">EXCHANGE:TICKER</span> (e.g.{' '}
-              <span className="font-mono text-slate-300">NYSE:IONQ</span>) to force an exchange. Saved in this browser.
+              <span className="font-mono text-slate-300">NYSE:IONQ</span>) to force an exchange. Saved changes automatically persist as your default in this browser.
             </p>
             <textarea
               rows={4}
@@ -440,10 +464,22 @@ export function StocksSentimentView({
               </button>
               <button
                 type="button"
+                onClick={handleCopyBookmarkLink}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-sky-300 bg-[#0b111b] border border-sky-800/70 rounded-md hover:bg-sky-950/50 transition-colors whitespace-nowrap shrink-0"
+              >
+                {copiedBookmark ? (
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                ) : (
+                  <Link2 className="w-3.5 h-3.5" />
+                )}
+                <span>{copiedBookmark ? 'Bookmark Link Copied' : 'Copy Bookmark Link'}</span>
+              </button>
+              <button
+                type="button"
                 onClick={handleResetDefault}
                 className="px-3.5 py-1.5 text-xs font-medium text-slate-300 bg-[#0b111b] border border-slate-700 rounded-md hover:bg-slate-800 transition-colors whitespace-nowrap shrink-0"
               >
-                Reset to default
+                Reset to factory default
               </button>
             </div>
           </form>

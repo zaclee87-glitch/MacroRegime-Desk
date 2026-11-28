@@ -138,7 +138,7 @@ export function MacroChatPanel({
                 <span>{msg.timestamp}</span>
               </div>
               <div className="whitespace-pre-wrap break-words">{previewText}</div>
-              {msg.reportId && (
+              {msg.reportId && msg.reportId !== activeReportId && (
                 <button
                   type="button"
                   onClick={() => onSelectReport(msg.reportId!)}

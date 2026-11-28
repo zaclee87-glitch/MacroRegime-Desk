@@ -21,6 +21,13 @@ import { StocksSentimentView } from './components/StocksSentimentView';
 const STORAGE_REPORTS_KEY = 'macroregime_reports_v2';
 const STORAGE_MESSAGES_KEY = 'macroregime_messages_v2';
 const STORAGE_WATCHLIST_KEY = 'macroregime_watchlist_v2';
+const STORAGE_WATCHLIST_SYMBOLS_KEY = 'macroregime_watchlist_symbols_v1';
+
+function serializeWatchlistSymbols(list: StockWatchlistItem[]): string {
+  return list
+    .map((item) => (item.exchangeOverride ? `${item.exchangeOverride}:${item.symbol}` : item.symbol))
+    .join(', ');
+}
 
 async function parseJsonResponse<T = any>(response: Response): Promise<T> {
   const text = await response.text();
@@ -240,6 +247,23 @@ export default function App() {
 
   const [watchlist, setWatchlist] = useState<StockWatchlistItem[]>(() => {
     try {
+      const url = new URL(window.location.href);
+      const wlParam = url.searchParams.get('wl');
+      if (wlParam && wlParam.trim()) {
+        const paramEntries = parseWatchlistEntries(wlParam);
+        if (paramEntries.length > 0) {
+          url.searchParams.delete('wl');
+          window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+          return paramEntries.map((entry) =>
+            createEmptyWatchlistItem(entry.symbol, INITIAL_REFERENCE_REPORT, entry.exchangeOverride)
+          );
+        }
+      }
+    } catch {
+      // Ignore URL parse errors
+    }
+
+    try {
       const saved = localStorage.getItem(STORAGE_WATCHLIST_KEY);
       if (saved !== null) {
         const parsed = JSON.parse(saved) as StockWatchlistItem[];
@@ -278,6 +302,19 @@ export default function App() {
     } catch {
       // Ignore storage read failures
     }
+
+    try {
+      const savedSymbols = localStorage.getItem(STORAGE_WATCHLIST_SYMBOLS_KEY);
+      if (savedSymbols !== null) {
+        const entries = parseWatchlistEntries(savedSymbols);
+        return entries.map((entry) =>
+          createEmptyWatchlistItem(entry.symbol, INITIAL_REFERENCE_REPORT, entry.exchangeOverride)
+        );
+      }
+    } catch {
+      // Ignore storage read failures
+    }
+
     return parseWatchlistEntries(DEFAULT_WATCHLIST_STRING).map((entry) =>
       createEmptyWatchlistItem(entry.symbol, INITIAL_REFERENCE_REPORT, entry.exchangeOverride)
     );
@@ -311,7 +348,11 @@ export default function App() {
     try {
       localStorage.setItem(STORAGE_REPORTS_KEY, JSON.stringify(reports));
     } catch {
-      // Ignore storage quota errors
+      try {
+        localStorage.setItem(STORAGE_REPORTS_KEY, JSON.stringify(reports.slice(0, 4)));
+      } catch {
+        // Ignore storage quota errors
+      }
     }
   }, [reports]);
 
@@ -325,9 +366,22 @@ export default function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_WATCHLIST_KEY, JSON.stringify(watchlist));
+      localStorage.setItem(STORAGE_WATCHLIST_SYMBOLS_KEY, serializeWatchlistSymbols(watchlist));
     } catch {
       // Ignore storage quota errors
+    }
+    try {
+      localStorage.setItem(STORAGE_WATCHLIST_KEY, JSON.stringify(watchlist));
+    } catch {
+      try {
+        const compactList = watchlist.map((item) => ({
+          ...item,
+          recentHeadlines: [],
+        }));
+        localStorage.setItem(STORAGE_WATCHLIST_KEY, JSON.stringify(compactList));
+      } catch {
+        // Ignore storage quota errors
+      }
     }
   }, [watchlist]);
 
@@ -544,10 +598,16 @@ export default function App() {
   ) => {
     const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const displayPrompt =
+      prompt.length > 240
+        ? prompt.includes('# PROMPT:')
+          ? `Macro scan prompt (${prompt.length.toLocaleString()} chars)`
+          : `Pasted report (${prompt.length.toLocaleString()} chars)`
+        : prompt;
     const userMsg: ChatMessage = {
       id: `u-${uid()}`,
       role: 'user',
-      content: prompt,
+      content: displayPrompt,
       timestamp: nowTime,
     };
     setMessages((prev) => [...prev, userMsg]);

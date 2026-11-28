@@ -825,9 +825,7 @@ export function createApiApp(): express.Express {
           type: "report",
           mode: "parsed-report",
           report,
-          assistantMessage: `Parsed pasted report into the 7-section dashboard. Regime: ${
-            (structured as { section1?: { regimeName?: string } }).section1?.regimeName ?? "Loaded"
-          }.`,
+          assistantMessage: "Input successfully parsed into the dashboard.",
         });
         return;
       }
